@@ -201,9 +201,14 @@ class CampusDataStore {
       }
 
       if (score >= 65) {
+        const itemImage = found.imageUrl || found.image || (found.description?.toLowerCase().includes("flask") ? "/demo/water_bottle.jpg" : "/demo/headphones_found.jpg");
         matches.push({
           similarityEstimate: Math.min(score, 97),
-          foundItem: found,
+          foundItem: {
+            ...found,
+            imageUrl: itemImage,
+            image: itemImage
+          },
           reasons: reasons.length ? reasons : ["Similar physical dimensions and campus area"],
           differences: differences.length ? differences : ["Slight surface wear on found item"],
           explanation: `Visual AI correlated category geometry, colorway, and location context with ${Math.min(score, 97)}% confidence.`

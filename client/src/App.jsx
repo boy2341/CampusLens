@@ -597,7 +597,8 @@ function LostLens({ notify, demoMode }) {
         const mockFound = {
           id: "FND-1049",
           location: "Library 2nd Floor (Quiet Study Room A)",
-          imageUrl: null,
+          imageUrl: "/demo/headphones_found.jpg",
+          image: "/demo/headphones_found.jpg",
           title: "Black Wireless Over-Ear Headphones"
         };
         const mockMatch = {
@@ -695,7 +696,8 @@ function LostLens({ notify, demoMode }) {
       const mockFound = {
         id: "FND-1049",
         location: "Library 2nd Floor (Quiet Study Room A)",
-        imageUrl: null,
+        imageUrl: "/demo/headphones_found.jpg",
+        image: "/demo/headphones_found.jpg",
         title: "Black Wireless Over-Ear Headphones"
       };
       const mockMatch = {
@@ -1000,7 +1002,13 @@ function LostLens({ notify, demoMode }) {
                   <ItemVisual
                     title="POSSIBLE FOUND ITEM"
                     variant="headphones-alt"
-                    imageUrl={topMatch.foundItem?.imageUrl}
+                    imageUrl={
+                      topMatch.foundItem?.imageUrl ||
+                      topMatch.foundItem?.image ||
+                      (description?.toLowerCase().includes("flask") || description?.toLowerCase().includes("bottle")
+                        ? "/demo/water_bottle.jpg"
+                        : "/demo/headphones_found.jpg")
+                    }
                     label={
                       topMatch.foundItem?.location
                         ? `Found near ${topMatch.foundItem.location}`
