@@ -1,0 +1,22 @@
+{
+  "projectName": "campuslens",
+  "teamName": "campuslens",
+  "tagline": "your campus , powered by ai",
+  "teamMembers": [
+    "Govind",
+    "Abhishank",
+    "Sanidhya",
+    "Charvi"
+  ],
+  "problemStatement": "CampusLens aims to solve this by building an AI-powered campus intelligence layer that can understand natural-language requests, analyze images, classify campus issues, intelligently match lost and found items, and provide contextual event and academic recommendations",
+  "frontend": "React (Vite)",
+  "backend": "Express",
+  "database": "MongoDB",
+  "authentication": "JWT",
+  "addons": [
+    "Docker setup",
+    "TailwindCSS",
+    "Socket.io"
+  ],
+  "installDeps": true
+}
