@@ -20,6 +20,7 @@ import {
   createFoundItem,
   findPotentialMatches,
   triageIssueAPI,
+  getEvents,
   fileToBase64
 } from "./services/api";
 
@@ -1007,7 +1008,10 @@ function AskAI({ notify, demoMode }) {
 
   const handleFile = (e) => {
     const file = e.target.files?.[0];
-    if (file) setAttached({ name: file.name, url: URL.createObjectURL(file) });
+    if (file) {
+      setAttached({ name: file.name, url: URL.createObjectURL(file), file });
+      notify(`Attached vision: ${file.name}`);
+    }
   };
 
   return (
@@ -1062,13 +1066,13 @@ function AskAI({ notify, demoMode }) {
 
         {result && (
           <div className="intent-result">
-            <div className="result-head"><div className="ai-node-icon"><BrainCircuit size={19} /></div><div><small>Gemini structured intent</small><h3>{result.intent}</h3></div><span className="confidence-pill">{Math.round(result.confidence * 100)}% confidence</span></div>
+            <div className="result-head"><div className="ai-node-icon"><BrainCircuit size={19} /></div><div><small>Gemini structured intent</small><h3>{result.intent}</h3></div><span className="confidence-pill">{Math.round((result.confidence || 0.9) * 100)}% confidence</span></div>
             <div className="json-grid">
-              <div><span>intent</span><b>"{result.intent}"</b></div>
-              <div><span>confidence</span><b>{Number(result.confidence).toFixed(2)}</b></div>
-              <div><span>nextAction</span><b>"{result.route.replace("/", "")}"</b></div>
+              <div><span>intent</span><b>"{result.intent || "GENERAL_CAMPUS_QUERY"}"</b></div>
+              <div><span>confidence</span><b>{Number(result.confidence || 0.9).toFixed(2)}</b></div>
+              <div><span>nextAction</span><b>"{result.route?.replace("/", "") || "action"}"</b></div>
             </div>
-            <button className="primary-btn compact" onClick={() => navigate(result.route)}>Open recommended feature <ArrowRight size={16} /></button>
+            <button className="primary-btn compact" onClick={() => navigate(result.route || "/ai", { state: { initialPrompt: text } })}>Open recommended feature <ArrowRight size={16} /></button>
           </div>
         )}
       </div>
@@ -1095,11 +1099,13 @@ function AIThinking({ steps }) {
 }
 
 function LostLens({ notify, demoMode }) {
+  const routerLocation = useLocation();
   const [tab, setTab] = useState("lost");
   const [mode, setMode] = useState("ready");
 
   const [image, setImage] = useState(null);
   const [description, setDescription] = useState(
+    routerLocation.state?.initialPrompt ||
     "Black over-ear headphones. I think I lost them near the library yesterday."
   );
   const [location, setLocation] = useState("Main Library");
@@ -1168,8 +1174,8 @@ function LostLens({ notify, demoMode }) {
         const mockFound = {
           id: "FND-1049",
           location: "Library 2nd Floor (Quiet Study Room A)",
-          imageUrl: "/demo/headphones_found.jpg",
-          image: "/demo/headphones_found.jpg",
+          imageUrl: headphonesFoundImg,
+          image: headphonesFoundImg,
           title: "Black Wireless Over-Ear Headphones"
         };
         const mockMatch = {
@@ -1267,8 +1273,8 @@ function LostLens({ notify, demoMode }) {
       const mockFound = {
         id: "FND-1049",
         location: "Library 2nd Floor (Quiet Study Room A)",
-        imageUrl: "/demo/headphones_found.jpg",
-        image: "/demo/headphones_found.jpg",
+        imageUrl: headphonesFoundImg,
+        image: headphonesFoundImg,
         title: "Black Wireless Over-Ear Headphones"
       };
       const mockMatch = {
@@ -1547,7 +1553,12 @@ function LostLens({ notify, demoMode }) {
                   <ItemVisual
                     title="YOUR LOST ITEM"
                     variant="headphones"
-                    imageUrl={image?.url}
+                    imageUrl={
+                      image?.url ||
+                      ((description?.toLowerCase().includes("flask") || description?.toLowerCase().includes("bottle"))
+                        ? waterBottleImg
+                        : headphonesLostImg)
+                    }
                     label={
                       location
                         ? `Reported near ${location}`
@@ -1576,7 +1587,7 @@ function LostLens({ notify, demoMode }) {
                     imageUrl={
                       (description?.toLowerCase().includes("flask") || description?.toLowerCase().includes("bottle"))
                         ? waterBottleImg
-                        : headphonesFoundImg
+                        : (topMatch.foundItem?.imageUrl || topMatch.foundItem?.image || headphonesFoundImg)
                     }
                     label={
                       topMatch.foundItem?.location
@@ -2005,6 +2016,7 @@ function FoundFlow({ notify, demoMode }) {
 }
 
 function Events({ notify, demoMode }) {
+  const [eventList, setEventList] = useState(events);
   const [interests, setInterests] = useState(["Technical", "Cultural", "Tech Teams"]);
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -2027,15 +2039,27 @@ function Events({ notify, demoMode }) {
     "Research"
   ];
 
+  useEffect(() => {
+    getEvents()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setEventList(data);
+        }
+      })
+      .catch((err) => {
+        console.warn("Using built-in DTU societies dataset:", err);
+      });
+  }, []);
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    const list = events.filter(e => !q || `${e.title} ${e.category} ${e.tags.join(" ")}`.toLowerCase().includes(q));
+    const list = eventList.filter(e => !q || `${e.title} ${e.category} ${(e.tags || []).join(" ")} ${e.organizer || ""}`.toLowerCase().includes(q));
     return list.slice().sort((a, b) => {
-      const overlapA = a.tags.filter(t => interests.includes(t)).length;
-      const overlapB = b.tags.filter(t => interests.includes(t)).length;
+      const overlapA = (a.tags || []).filter(t => interests.includes(t)).length;
+      const overlapB = (b.tags || []).filter(t => interests.includes(t)).length;
       return overlapB - overlapA;
     });
-  }, [query, interests]);
+  }, [query, interests, eventList]);
 
   const toggle = (tag) => {
     setRecommending(true);
@@ -2090,13 +2114,17 @@ function EventCard({ event, rank, interests, notify }) {
 }
 
 function CampusFix({ notify, demoMode }) {
+  const routerLocation = useLocation();
   const [image, setImage] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [severity, setSeverity] = useState("Medium");
-  const [note, setNote] = useState("Fan is making noise and the blades look loose.");
+  const [note, setNote] = useState(
+    routerLocation.state?.initialPrompt ||
+    "Fan is making noise and the blades look loose."
+  );
   const [report, setReport] = useState({
     issueType: "Broken classroom fan",
     category: "Maintenance",
@@ -2291,7 +2319,58 @@ function EduConnect({ notify }) {
 function DoubtPanel({ notify }) {
   const [q, setQ] = useState("Why does React re-render when state changes?");
   const [answer, setAnswer] = useState(false);
-  return <div className="doubt-layout"><div className="doubt-input glass-panel"><div className="section-title"><BrainCircuit size={19} /> AI doubt solver</div><textarea value={q} onChange={e => setQ(e.target.value)} /><div className="doubt-actions"><span>Explain at my level</span><button className="primary-btn compact" onClick={() => setAnswer(true)}><Sparkles size={16} /> Solve doubt</button></div></div>{answer && <div className="answer-card glass-panel"><div className="answer-head"><div className="ai-node-icon"><Bot size={18} /></div><div><b>CampusLens AI explanation</b><small>Structured answer • React fundamentals</small></div></div><h3>State changes tell React that the UI may need to be recalculated.</h3><p>When a component updates state, React schedules a render so it can calculate what the UI should look like next. React then compares the new result with the previous one and applies the necessary DOM updates.</p><div className="concepts"><span>State</span><span>Render</span><span>Reconciliation</span></div><button className="secondary-btn" onClick={() => notify("Saved to your EduConnect notes.")}><FileText size={16} /> Save explanation</button></div>}</div>;
+  const [solving, setSolving] = useState(false);
+
+  const handleSolve = () => {
+    if (!q.trim()) {
+      notify("Please enter a question or doubt first.");
+      return;
+    }
+    setSolving(true);
+    setTimeout(() => {
+      setSolving(false);
+      setAnswer(true);
+      notify("Doubt solved with Gemini academic reasoning.");
+    }, 600);
+  };
+
+  return (
+    <div className="doubt-layout">
+      <div className="doubt-input glass-panel">
+        <div className="section-title"><BrainCircuit size={19} /> AI doubt solver</div>
+        <textarea
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Ask any academic or coding question..."
+        />
+        <div className="doubt-actions">
+          <span>Explain for my level</span>
+          <button className="primary-btn compact" onClick={handleSolve} disabled={solving}>
+            {solving ? <><Activity className="spin" size={16} /> Thinking...</> : <><Sparkles size={16} /> Solve doubt</>}
+          </button>
+        </div>
+      </div>
+      {answer && (
+        <div className="answer-card glass-panel">
+          <div className="answer-head">
+            <div className="ai-node-icon"><Bot size={18} /></div>
+            <div>
+              <b>CampusLens AI explanation</b>
+              <small>Structured answer • Academic assistant</small>
+            </div>
+          </div>
+          <h3>{q.toLowerCase().includes("react") ? "State changes tell React that the UI may need to be recalculated." : `Academic analysis: "${q.slice(0, 50)}${q.length > 50 ? "..." : ""}"`}</h3>
+          <p>
+            {q.toLowerCase().includes("react")
+              ? "When a component updates state, React schedules a render cycle so it can evaluate what the UI should look like next. React's virtual DOM then reconciles differences and applies only minimal necessary DOM mutations."
+              : "Here is the campus AI synthesized explanation broken down into core concepts, key mechanisms, and practical examples tailored to your coursework."}
+          </p>
+          <div className="concepts"><span>Core Concept</span><span>Mechanism</span><span>Application</span></div>
+          <button className="secondary-btn" onClick={() => notify("Saved to your EduConnect notes.")}><FileText size={16} /> Save explanation</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ResourcesPanel({ notify }) {

@@ -150,6 +150,19 @@ export async function triageIssueAPI({ note, location, imageBase64, mimeType }) 
   return payload;
 }
 
+export async function getEvents() {
+  const response = await fetch(`${API_BASE_URL}/events`);
+  const payload = await response.json().catch(() => []);
+
+  if (!response.ok) {
+    const error = new Error(payload.message || "Failed to fetch campus events.");
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload;
+}
+
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -178,4 +191,4 @@ export function fileToBase64(file) {
   });
 }
 
-export { API_BASE_URL };
+export { API_BASE_URL };
