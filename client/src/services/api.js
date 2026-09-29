@@ -125,6 +125,31 @@ export async function findPotentialMatches(lostItemId) {
   return data;
 }
 
+export async function triageIssueAPI({ note, location, imageBase64, mimeType }) {
+  const response = await fetch(`${API_BASE_URL}/campusfix/triage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      note,
+      location,
+      imageBase64,
+      mimeType
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(payload.message || "Could not triage facility issue.");
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload;
+}
+
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

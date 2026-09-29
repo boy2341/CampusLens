@@ -14,6 +14,8 @@ import {
   detectIntent,
   createLostItem,
   createFoundItem,
+  findPotentialMatches,
+  triageIssueAPI,
   fileToBase64
 } from "./services/api";
 
@@ -43,7 +45,7 @@ const mentors = [
 ];
 
 function App() {
-  const [demoMode, setDemoMode] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -554,6 +556,26 @@ function LostLens({ notify, demoMode }) {
     setMatches([]);
   };
 
+  const loadPreset = async (url, filename, desc, loc) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      setImage({
+        file,
+        url,
+        name: filename
+      });
+      if (desc) setDescription(desc);
+      if (loc) setLocation(loc);
+      setMode("ready");
+      setMatches([]);
+      notify(`Loaded trial photo: ${filename}`);
+    } catch (e) {
+      console.warn("Could not load preset photo:", e);
+    }
+  };
+
   const analyzeAndFindMatches = async () => {
     if (!description.trim()) {
       notify("Please describe the item first.");
@@ -770,6 +792,40 @@ function LostLens({ notify, demoMode }) {
                 </>
               )}
             </label>
+
+            <div className="preset-container">
+              <span className="preset-title">Trial presets:</span>
+              <div className="preset-pills">
+                <button
+                  type="button"
+                  className="preset-btn"
+                  onClick={() =>
+                    loadPreset(
+                      "/demo/headphones_lost.jpg",
+                      "headphones_lost.jpg",
+                      "Black over-ear wireless headphones with cushioned earcups and silver sliders.",
+                      "Main Library (2nd Floor)"
+                    )
+                  }
+                >
+                  🎧 Black Headphones
+                </button>
+                <button
+                  type="button"
+                  className="preset-btn"
+                  onClick={() =>
+                    loadPreset(
+                      "/demo/water_bottle.jpg",
+                      "water_bottle.jpg",
+                      "Navy blue insulated stainless steel water bottle with university stickers.",
+                      "Library 1st Floor Study Desk"
+                    )
+                  }
+                >
+                  🧴 Hydro Flask
+                </button>
+              </div>
+            </div>
 
             <div className="field">
               <label>What do you remember?</label>
@@ -1109,6 +1165,24 @@ function FoundFlow({ notify, demoMode }) {
 
   const ref = useRef();
 
+  const loadPreset = async (url, filename, desc, loc) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      setImage({
+        file,
+        url,
+        name: filename
+      });
+      if (desc) setDescription(desc);
+      if (loc) setLocation(loc);
+      notify(`Loaded trial photo: ${filename}`);
+    } catch (e) {
+      console.warn("Could not load preset photo:", e);
+    }
+  };
+
   const handleAnalyzeFoundItem = async () => {
     if (!description.trim()) {
       notify("Please describe the found item first.");
@@ -1213,6 +1287,26 @@ function FoundFlow({ notify, demoMode }) {
             </>
           )}
         </label>
+
+        <div className="preset-container">
+          <span className="preset-title">Trial presets:</span>
+          <div className="preset-pills">
+            <button
+              type="button"
+              className="preset-btn"
+              onClick={() =>
+                loadPreset(
+                  "/demo/headphones_found.jpg",
+                  "headphones_found.jpg",
+                  "Black wireless headphones with silver details found on study desk.",
+                  "Main Library (Quiet Room A)"
+                )
+              }
+            >
+              🎧 Found Headphones
+            </button>
+          </div>
+        </div>
 
         <div className="field">
           <label>What did you find?</label>
@@ -1399,6 +1493,7 @@ function EventCard({ event, rank, interests, notify }) {
 
 function CampusFix({ notify, demoMode }) {
   const [image, setImage] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -1413,17 +1508,65 @@ function CampusFix({ notify, demoMode }) {
   const ref = useRef();
 
   const steps = [
-    "📸 Understanding the issue...",
-    "🧠 Classifying the problem...",
-    "📝 Preparing your report..."
+    "📸 Inspecting image & notes with Gemini...",
+    "🧠 Classifying hazard & urgency...",
+    "📝 Drafting facilities work order..."
   ];
 
-  const analyze = () => {
+  const loadPreset = async (url, filename, defaultNote) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+      setImage(url);
+      setImageFile(file);
+      if (defaultNote) setNote(defaultNote);
+      notify(`Loaded trial photo: ${filename}`);
+    } catch (e) {
+      console.warn("Preset load failed:", e);
+    }
+  };
+
+  const analyze = async () => {
     setAnalyzing(true);
     setAnalysisStep(0);
-    setTimeout(() => setAnalysisStep(1), 500);
-    setTimeout(() => setAnalysisStep(2), 1000);
-    setTimeout(() => {
+    const t1 = setTimeout(() => setAnalysisStep(1), 600);
+    const t2 = setTimeout(() => setAnalysisStep(2), 1200);
+
+    try {
+      let imageBase64 = null;
+      let mimeType = null;
+      if (imageFile) {
+        imageBase64 = await fileToBase64(imageFile);
+        mimeType = imageFile.type;
+      }
+
+      const res = await triageIssueAPI({
+        note,
+        location: "Science Block · B-204",
+        imageBase64,
+        mimeType
+      });
+
+      clearTimeout(t1);
+      clearTimeout(t2);
+      setAnalyzing(false);
+
+      if (res?.data) {
+        const d = res.data;
+        setReport({
+          issueType: d.issueType,
+          category: d.category,
+          priority: `${d.severity} priority`,
+          description: d.description
+        });
+        setSeverity(d.severity === "HIGH" ? "High" : d.severity === "LOW" ? "Low" : "Medium");
+        notify("Gemini Vision triaged the issue: Report generated.");
+      }
+    } catch (err) {
+      console.warn("CampusFix API call fallback:", err);
+      clearTimeout(t1);
+      clearTimeout(t2);
       setAnalyzing(false);
       setReport({
         issueType: "Ceiling Fan Wobble & Loose Blade",
@@ -1431,8 +1574,8 @@ function CampusFix({ notify, demoMode }) {
         priority: `${severity} priority`,
         description: "Gemini Vision detected visible rotation imbalance and loose mounting slack on the ceiling fan assembly. Potential safety hazard near student seating."
       });
-      notify("Gemini Vision triaged the issue: Report generated.");
-    }, 1500);
+      notify("Offline preview: Issue triaged.");
+    }
   };
 
   return (
@@ -1442,10 +1585,41 @@ function CampusFix({ notify, demoMode }) {
         <div className="fix-intake glass-panel">
           <div className="section-title"><Camera size={20} /> Multimodal vision intake <span className="live-status"><span className="live-dot" /> FRAME CAPTURED</span></div>
           <label className="fix-photo" onClick={() => ref.current?.click()}>
-            <input ref={ref} type="file" accept="image/*" hidden onChange={e => { const f=e.target.files?.[0]; if(f) setImage(URL.createObjectURL(f)); }} />
+            <input
+              ref={ref}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  setImage(URL.createObjectURL(f));
+                  setImageFile(f);
+                }
+              }}
+            />
             {image ? <img src={image} alt="Issue upload" /> : <div className="mock-issue"><div className="ceiling" /><div className="fan"><span /><span /><span /><i /></div><div className="hazard-badge"><AlertTriangle size={15} /> Potential maintenance issue</div></div>}
             <div className="photo-overlay"><span><MapPin size={14} /> SCIENCE BLOCK · B-204</span><span><Activity size={14} /> INDOOR</span></div>
           </label>
+
+          <div className="preset-container">
+            <span className="preset-title">Trial preset:</span>
+            <div className="preset-pills">
+              <button
+                type="button"
+                className="preset-btn"
+                onClick={() =>
+                  loadPreset(
+                    "/demo/broken_fan.jpg",
+                    "broken_fan.jpg",
+                    "Ceiling fan blade is visibly bent and rattling loudly near student seating in Room B-204."
+                  )
+                }
+              >
+                🌀 Broken Ceiling Fan
+              </button>
+            </div>
+          </div>
           <div className="field"><label>Optional note</label><textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Add anything you noticed..." /></div>
           <button className="primary-btn full" onClick={analyze} disabled={analyzing}>
             {analyzing ? <><Activity className="spin" size={18} /> {steps[analysisStep]}</> : <><Sparkles size={18} /> Analyze with Gemini Vision</>}

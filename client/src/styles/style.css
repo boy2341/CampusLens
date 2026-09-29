@@ -209,3 +209,47 @@ body{background:var(--bg);color:var(--text)}
 .hero-search-box input::placeholder{color:#718092}
 .hero-search-btn{border:0;background:linear-gradient(135deg,#0bc9ee,#09b9ea);color:#05212b;padding:10px 16px;border-radius:10px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:transform .2s}
 .hero-search-btn:hover{transform:translateY(-1px)}
+
+.preset-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 16px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(25, 213, 245, 0.25);
+  border-radius: 12px;
+}
+.preset-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7d8e9e;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.preset-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.preset-btn {
+  background: #141f2c;
+  color: #71e6f9;
+  border: 1px solid rgba(25, 213, 245, 0.3);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.preset-btn:hover {
+  background: #1d2f44;
+  border-color: #4ae1f5;
+  color: #ffffff;
+  transform: translateY(-1px);
+}

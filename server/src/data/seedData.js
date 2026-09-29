@@ -81,7 +81,7 @@ export const initialFoundItems = [
     location: "Library 2nd Floor (Quiet Study Room A)",
     date: "Yesterday · 4:30 PM",
     status: "active",
-    imageUrl: null,
+    imageUrl: "/demo/headphones_found.jpg",
     fingerprint: {
       objectType: "Wireless Over-Ear Headphones",
       color: "Matte Black",
@@ -99,7 +99,7 @@ export const initialFoundItems = [
     location: "Science Block Lab 3",
     date: "Today · 9:15 AM",
     status: "active",
-    imageUrl: null,
+    imageUrl: "/demo/water_bottle.jpg",
     fingerprint: {
       objectType: "Insulated Water Bottle",
       color: "Navy Blue",

@@ -1,4 +1,5 @@
 import { store } from '../models/store.js';
+import { extractVisualFingerprintWithGemini, compareItemsWithGemini } from '../services/geminiService.js';
 
 export async function createLost(req, res, next) {
   try {
@@ -11,12 +12,21 @@ export async function createLost(req, res, next) {
       });
     }
 
+    // Attempt Gemini visual/textual fingerprint extraction
+    const geminiFingerprint = await extractVisualFingerprintWithGemini({
+      imageBase64,
+      mimeType,
+      description,
+      location
+    });
+
     const item = store.createLostItem({
       description,
       location,
       imageBase64,
       mimeType,
-      userId: userId || 'demo-user'
+      userId: userId || 'demo-user',
+      fingerprint: geminiFingerprint || undefined
     });
 
     return res.status(201).json({
@@ -39,12 +49,21 @@ export async function createFound(req, res, next) {
       });
     }
 
+    // Attempt Gemini visual/textual fingerprint extraction
+    const geminiFingerprint = await extractVisualFingerprintWithGemini({
+      imageBase64,
+      mimeType,
+      description,
+      location
+    });
+
     const item = store.createFoundItem({
       description,
       location,
       imageBase64,
       mimeType,
-      userId: userId || 'demo-finder'
+      userId: userId || 'demo-finder',
+      fingerprint: geminiFingerprint || undefined
     });
 
     return res.status(201).json({
@@ -69,6 +88,30 @@ export async function getMatches(req, res, next) {
 
     const lostItem = store.getLostItemById(lostItemId);
     const matches = store.findMatchesForLostItem(lostItem);
+
+    // If matches found and Gemini is online, enhance top match with Gemini multimodal reasoning
+    if (matches.length > 0 && lostItem) {
+      const top = matches[0];
+      const geminiCompare = await compareItemsWithGemini({
+        lostItem,
+        foundItem: top.foundItem
+      });
+
+      if (geminiCompare) {
+        if (geminiCompare.similarityEstimate) {
+          top.similarityEstimate = geminiCompare.similarityEstimate;
+        }
+        if (geminiCompare.reasons?.length) {
+          top.reasons = geminiCompare.reasons;
+        }
+        if (geminiCompare.differences?.length) {
+          top.differences = geminiCompare.differences;
+        }
+        if (geminiCompare.explanation) {
+          top.explanation = geminiCompare.explanation;
+        }
+      }
+    }
 
     return res.json({
       success: true,

@@ -1,4 +1,6 @@
+import mongoose from 'mongoose';
 import { initialEvents, initialFoundItems, initialIssues, initialMentors } from '../data/seedData.js';
+import { LostItemModel, FoundItemModel, EventModel, IssueModel } from './schemas.js';
 
 class CampusDataStore {
   constructor() {
@@ -25,6 +27,7 @@ class CampusDataStore {
       description: item.description || "",
       location: item.location || "",
       imageBase64: item.imageBase64 || null,
+      imageUrl: item.imageUrl || null,
       mimeType: item.mimeType || "image/jpeg",
       date: item.date || "Just now",
       status: "active",
@@ -32,6 +35,21 @@ class CampusDataStore {
       createdAt: new Date().toISOString()
     };
     this.lostItems.unshift(newItem);
+
+    if (mongoose.connection.readyState === 1) {
+      LostItemModel.create({
+        id: newItem.id,
+        userId: newItem.userId,
+        image: newItem.imageUrl || (newItem.imageBase64 ? `data:${newItem.mimeType};base64,${newItem.imageBase64.slice(0, 100)}...` : null),
+        description: newItem.description,
+        location: newItem.location,
+        date: newItem.date,
+        fingerprint: newItem.fingerprint,
+        status: newItem.status,
+        createdAt: newItem.createdAt
+      }).catch(err => console.warn('[Database] LostItem save warning:', err.message));
+    }
+
     return newItem;
   }
 
@@ -51,6 +69,7 @@ class CampusDataStore {
       description: item.description || "",
       location: item.location || "",
       imageBase64: item.imageBase64 || null,
+      imageUrl: item.imageUrl || null,
       mimeType: item.mimeType || "image/jpeg",
       date: item.date || "Just now",
       status: "active",
@@ -58,6 +77,21 @@ class CampusDataStore {
       createdAt: new Date().toISOString()
     };
     this.foundItems.unshift(newItem);
+
+    if (mongoose.connection.readyState === 1) {
+      FoundItemModel.create({
+        id: newItem.id,
+        userId: newItem.userId,
+        image: newItem.imageUrl || (newItem.imageBase64 ? `data:${newItem.mimeType};base64,${newItem.imageBase64.slice(0, 100)}...` : null),
+        description: newItem.description,
+        location: newItem.location,
+        date: newItem.date,
+        fingerprint: newItem.fingerprint,
+        status: newItem.status,
+        createdAt: newItem.createdAt
+      }).catch(err => console.warn('[Database] FoundItem save warning:', err.message));
+    }
+
     return newItem;
   }
 
@@ -225,10 +259,27 @@ class CampusDataStore {
       severity: (issue.severity || "MEDIUM").toUpperCase(),
       location: issue.location || "Campus Facility",
       description: issue.description || "Reported maintenance issue.",
+      image: issue.image || null,
       status: "REPORTED",
       createdAt: new Date().toISOString()
     };
     this.issues.unshift(newIssue);
+
+    if (mongoose.connection.readyState === 1) {
+      IssueModel.create({
+        id: newIssue.id,
+        userId: newIssue.userId,
+        image: newIssue.image,
+        issueType: newIssue.issueType,
+        category: newIssue.category,
+        severity: newIssue.severity,
+        location: newIssue.location,
+        description: newIssue.description,
+        status: newIssue.status,
+        createdAt: newIssue.createdAt
+      }).catch(err => console.warn('[Database] Issue save warning:', err.message));
+    }
+
     return newIssue;
   }
 
@@ -236,12 +287,86 @@ class CampusDataStore {
     const issue = this.getIssueById(id);
     if (!issue) return null;
     issue.status = status.toUpperCase();
+
+    if (mongoose.connection.readyState === 1) {
+      IssueModel.updateOne({ id }, { status: issue.status })
+        .catch(err => console.warn('[Database] Issue status update warning:', err.message));
+    }
+
     return issue;
   }
 
   // --- MENTORS ---
   getMentors() {
     return this.mentors;
+  }
+
+  // --- INITIAL DATABASE SYNCHRONIZATION ---
+  async syncWithDatabase() {
+    if (mongoose.connection.readyState !== 1) return;
+    try {
+      // Seed found items if empty
+      const foundCount = await FoundItemModel.countDocuments();
+      if (foundCount === 0) {
+        await FoundItemModel.insertMany(
+          initialFoundItems.map(item => ({
+            id: item.id,
+            userId: item.userId,
+            image: item.imageUrl,
+            description: item.description,
+            location: item.location,
+            date: item.date,
+            fingerprint: item.fingerprint,
+            status: item.status,
+            createdAt: item.createdAt
+          }))
+        );
+        console.log('[Database] Seeded initial found items to MongoDB Atlas.');
+      } else {
+        const dbFound = await FoundItemModel.find({}).sort({ createdAt: -1 });
+        if (dbFound.length > 0) {
+          this.foundItems = dbFound.map(doc => ({
+            id: doc.id,
+            userId: doc.userId,
+            description: doc.description,
+            location: doc.location,
+            date: doc.date,
+            imageUrl: doc.image,
+            fingerprint: doc.fingerprint,
+            status: doc.status,
+            createdAt: doc.createdAt
+          }));
+        }
+      }
+
+      // Seed events if empty
+      const eventCount = await EventModel.countDocuments();
+      if (eventCount === 0) {
+        await EventModel.insertMany(initialEvents);
+        console.log('[Database] Seeded initial campus events to MongoDB Atlas.');
+      }
+
+      // Seed issues if empty
+      const issueCount = await IssueModel.countDocuments();
+      if (issueCount === 0) {
+        await IssueModel.insertMany(
+          initialIssues.map(iss => ({
+            id: iss.id,
+            userId: 'demo-reporter',
+            issueType: iss.issueType,
+            category: iss.category,
+            severity: iss.severity,
+            location: iss.location,
+            description: iss.description,
+            status: iss.status,
+            createdAt: iss.createdAt
+          }))
+        );
+        console.log('[Database] Seeded initial facility tickets to MongoDB Atlas.');
+      }
+    } catch (err) {
+      console.warn('[Database] Sync warning:', err.message);
+    }
   }
 }
 

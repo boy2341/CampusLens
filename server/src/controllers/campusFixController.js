@@ -1,8 +1,32 @@
 import { store } from '../models/store.js';
+import { triageFacilityIssueWithGemini } from '../services/geminiService.js';
 
 export async function triageIssue(req, res, next) {
   try {
-    const { note = '', location = 'Science Block · B-204' } = req.body;
+    const { note = '', location = 'Science Block · B-204', imageBase64, mimeType } = req.body;
+
+    // Attempt Gemini multimodal vision/text triage
+    const geminiTriage = await triageFacilityIssueWithGemini({
+      imageBase64,
+      mimeType,
+      note,
+      location
+    });
+
+    if (geminiTriage && geminiTriage.issueType) {
+      return res.json({
+        success: true,
+        data: {
+          issueType: geminiTriage.issueType,
+          category: geminiTriage.category || 'Facilities Maintenance',
+          severity: (geminiTriage.severity || 'MEDIUM').toUpperCase(),
+          description: geminiTriage.description || 'AI verified maintenance defect.',
+          suggestedDepartment: geminiTriage.suggestedDepartment || 'Facilities Management',
+          location: geminiTriage.location || location
+        }
+      });
+    }
+
     const lower = note.toLowerCase();
 
     let issueType = 'Classroom Hardware Maintenance';
